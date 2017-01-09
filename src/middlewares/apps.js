@@ -2,6 +2,7 @@ import { Router } from 'express'
 import App from '../models/app'
 import Version from '../models/version'
 import fs from 'fs'
+import fse from 'fs-extra'
 import path from 'path'
 
 const index = (req, res) => {
@@ -25,7 +26,7 @@ const index = (req, res) => {
 
 }
 
-const download = (req, res) => {
+const show = (req, res) => {
 
   const title = req.params.title
 
@@ -44,7 +45,6 @@ const download = (req, res) => {
     res.status(200).download(filepath, `${title}-${version}.zip`)
 
   }).catch(err => {
-    console.log(err)
     res.send(err.message)
   })
 
@@ -80,23 +80,55 @@ const create = (req, res) => {
 const publish = (req, res) => {
 
   const title = req.params.title
-  const version = req.params.version
 
-  App.where('title', req.params.title).fetch().then(app => {
+  return App.where('title', req.params.title).fetch().then(app => {
 
     if(!app) {
       return res.status(404).json({ message: `There is no app with the title '${title}'` })
     }
 
-    Version.where({
-      app_id: app.get('id')
+    return Version.where({
+      app_id: app.get('id'),
+      text: req.params.version
     }).fetch().then(version => {
 
       if(version) {
-        return res.status(404).json({ message: `There is already a bundle with version '${version}' for the app '${title}'` })
+        return res.status(404).json({ message: `There is already a bundle with version '${req.params.version}' for the app '${title}'` })
       }
-      res.status(200).json({ message: `Bundle successfully created for the app '${title}' with version '${version}'` })
 
+      if(!req.files || !req.files.bundle) {
+        return res.status(404).json({ message: 'There was no attached bundle' })
+      }
+
+      Version.forge({
+        app_id: app.get('id'),
+        text: req.params.version
+      }).save().then(version => {
+
+        app.save({
+          latest: req.params.version
+        }).then(app => {
+
+          fse.move(req.files.bundle.file, `./bundles/${title}-${req.params.version}.zip`, err => {
+
+            if(err) {
+              return res.send(err.message)
+            }
+
+            res.status(200).json({ message: `Bundle successfully created for the app '${title}' with version '${req.params.version}'` })
+
+          })
+
+        }).catch(err => {
+          res.send(err.message)
+        })
+
+      }).catch(err => {
+        res.send(err.message)
+      })
+
+    }).catch(err => {
+      res.send(err.message)
     })
 
 
@@ -108,8 +140,8 @@ const publish = (req, res) => {
 
 const router = Router()
 router.get('/', index)
-router.get('/:title', download)
-router.get('/:title/:version', download)
+router.get('/:title', show)
+router.get('/:title/:version', show)
 router.post('/:title', create)
 router.post('/:title/:version', publish)
 

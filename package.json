@@ -19,6 +19,8 @@
     "bookshelf": "^0.10.2",
     "checkit": "^0.7.0",
     "express": "^4.14.0",
+    "express-busboy": "^5.0.0",
+    "fs-extra": "^1.0.0",
     "knex": "^0.12.6",
     "pg": "^6.1.2"
   },
