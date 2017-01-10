@@ -1,5 +1,5 @@
 import checkit from  'checkit'
-import bookshelf from '../bookshelf'
+import bookshelf from '../services/bookshelf'
 import Version from './version'
 
 export default bookshelf.Model.extend({

@@ -1,6 +1,8 @@
 import { Router } from 'express'
 import App from '../models/app'
 import Version from '../models/version'
+import config from '../services/config'
+import s3 from '../services/s3'
 import fs from 'fs'
 import fse from 'fs-extra'
 import path from 'path'
@@ -13,7 +15,7 @@ const index = (req, res) => {
     apps.map(app => {
       json[app.get('title').toLowerCase()] = {
         versions: app.related('versions').map(version => ({
-          url: '',
+          url: `http://${config.aws.bucket}.s3.amazonaws.com/${app.get('title')}-${version.get('text')}.zip`,
           version: version.get('text')
         }))
       }
@@ -100,31 +102,50 @@ const publish = (req, res) => {
         return res.status(404).json({ message: 'There was no attached bundle' })
       }
 
-      Version.forge({
-        app_id: app.get('id'),
-        text: req.params.version
-      }).save().then(version => {
+      const filename = `${title}-${req.params.version}.zip`
 
-        app.save({
-          latest: req.params.version
-        }).then(app => {
+      fs.readFile(req.files.bundle.file, (err, data) => {
 
-          fse.move(req.files.bundle.file, `./bundles/${title}-${req.params.version}.zip`, err => {
+        if (err) {
+          return res.status(404).json({ message: 'Unable to read file' })
+        }
 
-            if(err) {
-              return res.send(err.message)
-            }
+        const object = {
+          Bucket: config.aws.bucket,
+          Key: `${title}-${req.params.version}.zip`,
+          ACL: 'public-read',
+          Body: data
+        }
 
-            res.status(200).json({ message: `Bundle successfully created for the app '${title}' with version '${req.params.version}'` })
+        s3.putObject(object, (err, data) => {
 
+          if(err) {
+            return res.status(404).json({ message: 'Unable to upload file' })
+          }
+
+          return Version.forge({
+            app_id: app.get('id'),
+            text: req.params.version
+          }).save().then(version => {
+
+            return app.save({
+              latest: req.params.version
+            }).then(app => {
+
+              fs.unlinkSync(req.files.bundle.file)
+
+              res.status(200).json({ message: `Bundle successfully created for the app '${title}' with version '${req.params.version}'` })
+
+            }).catch(err => {
+              res.send(err.message)
+            })
+
+          }).catch(err => {
+            res.send(err.message)
           })
 
-        }).catch(err => {
-          res.send(err.message)
         })
 
-      }).catch(err => {
-        res.send(err.message)
       })
 
     }).catch(err => {
