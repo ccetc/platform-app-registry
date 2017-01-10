@@ -30,13 +30,36 @@ const show = (req, res) => {
 
   const title = req.params.title
 
+  App.where('title', req.params.title).fetch({ withRelated: ['versions'] }).then(app => {
+
+    if(!app) {
+      return res.status(404).json({ message: `There is no app with the title '${title}'` })
+    }
+
+    const json = {
+      latest: app.get('latest'),
+      versions: app.related('versions').map(version => version.get('text'))
+    }
+
+    res.status(200).json(json)
+
+  }).catch(err => {
+    res.send(err.message)
+  })
+
+}
+
+const download = (req, res) => {
+
+  const title = req.params.title
+
   App.where('title', req.params.title).fetch().then(app => {
 
     if(!app) {
       return res.status(404).json({ message: `There is no app with the title '${title}'` })
     }
 
-    const version  = (!req.params.version || req.params.version === 'latest') ? app.get('latest') : req.params.version
+    const version  = (req.params.version === 'latest') ? app.get('latest') : req.params.version
 
     if(!version) {
       return res.status(404).json({ message: `Invalid version` })
@@ -160,7 +183,7 @@ const publish = (req, res) => {
 const router = Router()
 router.get('/', index)
 router.get('/:title', show)
-router.get('/:title/:version', show)
+router.get('/:title/:version', download)
 router.post('/:title', create)
 router.post('/:title/:version', publish)
 
