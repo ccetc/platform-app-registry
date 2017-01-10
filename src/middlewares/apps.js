@@ -14,10 +14,8 @@ const index = (req, res) => {
     let json = {}
     apps.map(app => {
       json[app.get('title').toLowerCase()] = {
-        versions: app.related('versions').map(version => ({
-          url: `http://${config.aws.bucket}.s3.amazonaws.com/${app.get('title')}-${version.get('text')}.zip`,
-          version: version.get('text')
-        }))
+        latest: app.get('latest'),
+        versions: app.related('versions').map(version => version.get('text'))
       }
     })
     res.json(json)
@@ -38,13 +36,13 @@ const show = (req, res) => {
       return res.status(404).json({ message: `There is no app with the title '${title}'` })
     }
 
-    const version  = req.params.version || app.get('latest')
-    const filepath = path.resolve(`./bundles/${title}-${version}.zip`)
-    if(!fs.existsSync(filepath)) {
-      return res.status(404).json({ message: `There is no version '${version}' for the app '${title}'` })
+    const version  = (!req.params.version || req.params.version === 'latest') ? app.get('latest') : req.params.version
+
+    if(!version) {
+      return res.status(404).json({ message: `Invalid version` })
     }
 
-    res.status(200).download(filepath, `${title}-${version}.zip`)
+    res.redirect(301, `http://${config.aws.bucket}.s3.amazonaws.com/${title}-${version}.zip`,);
 
   }).catch(err => {
     res.send(err.message)
