@@ -59,13 +59,19 @@ const download = (req, res) => {
       return res.status(404).json({ message: `There is no app with the title '${title}'` })
     }
 
-    const version  = (req.params.version === 'latest') ? app.get('latest') : req.params.version
+    const app_id = app.get('id')
+    const text  = (req.params.version === 'latest') ? app.get('latest') : req.params.version
 
-    if(!version) {
-      return res.status(404).json({ message: `Invalid version` })
-    }
+    Version.where({ app_id, text }).fetch().then(version => {
 
-    res.redirect(301, `http://${config.aws.bucket}.s3.amazonaws.com/${title}-${version}.zip`,);
+      if(!version) {
+        return res.status(404).json({ message: `Invalid version` })
+      }
+
+      res.redirect(301, `http://${config.aws.bucket}.s3.amazonaws.com/${title}-${version.get('text')}.zip`,);
+
+    })
+
 
   }).catch(err => {
     res.send(err.message)
