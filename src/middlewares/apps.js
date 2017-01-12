@@ -89,9 +89,9 @@ const create = (req, res) => {
       return res.status(404).json({ message: `There is already an app with the title '${title}'` })
     }
 
-    return App.forge({
-      title: req.params.title
-    }).save().then(app => {
+    const title = req.params.title
+
+    return App.forge({ title }).save().then(app => {
 
       res.status(200).json({ message: `An app with the title '${title}' was successfully created` })
 
@@ -190,7 +190,6 @@ const router = Router()
 router.get('/', index)
 router.get('/:title', show)
 router.get('/:title/:version', download)
-router.post('/:title', create)
 router.post('/:title/:version', publish)
 
 export default router
